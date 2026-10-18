@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+}
+
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  emailVerified   Boolean  @default(false)
+  image           String?
+  username        String?  @unique
+  displayUsername String?
+  passwordHash    String?
+  role            UserRole @default(STUDENT)
+
+  sessions                      Session[]
+  accounts                      Account[]
+  submissions                   Submission[]
+  uploadedFiles                 UploadedFile[]
+  uploadedAssignmentAttachments AssignmentAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Course {
+  id               String           @id @default(cuid())
+  title            String
+  description      String?
+  code             String           @unique
+  assignments      Assignment[]
+  files            UploadedFile[]
+  timetableEntries TimetableEntry[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Assignment {
+  id          String                 @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  courseId    String
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  attachments AssignmentAttachment[]
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  content      String?
+  fileUrl      String?
+  status       SubmissionStatus @default(SUBMITTED)
+  grade        Float?
+  feedback     String?
+  studentId    String
+  assignmentId String
+  student      User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submittedAt  DateTime         @default(now())
+
+  @@unique([studentId, assignmentId])
+}
+
+model UploadedFile {
+  id           String   @id @default(cuid())
+  name         String
+  url          String
+  storageKey   String?
+  mimeType     String?
+  size         Int?
+  courseId     String?
+  uploadedById String
+  course       Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+model AssignmentAttachment {
+  id           String     @id @default(cuid())
+  originalName String
+  storageKey   String     @unique
+  mimeType     String?
+  size         Int
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([assignmentId])
+}
+
+model TimetableEntry {
+  id         String  @id @default(cuid())
+  title      String
+  dayOfWeek  Int
+  startTime  String
+  endTime    String
+  room       String?
+  instructor String?
+  notes      String?
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dayOfWeek])
+  @@index([courseId])
+}
