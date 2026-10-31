@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import { deleteFromDrive, driveDownloadUrl } from "@/lib/google-drive";
 
 export const runtime = "nodejs";
 
@@ -62,13 +62,10 @@ export async function DELETE(
 
     const storageKey = material.storageKey || material.url;
 
-    const { error: storageError } = await supabase.storage
-      .from("course-materials")
-      .remove([storageKey]);
-
-    if (storageError) {
-      console.error("Supabase delete error:", storageError.message);
-
+    try {
+      await deleteFromDrive(storageKey);
+    } catch (storageError) {
+      console.error("Google Drive delete error:", storageError);
       return NextResponse.json(
         { error: "Could not delete the stored file. Please try again." },
         { status: 502 },
@@ -145,23 +142,8 @@ export async function GET(
       );
     }
 
-    const { data, error } = await supabase.storage
-      .from("course-materials")
-      .createSignedUrl(storageKey, 60, {
-        download: material.name,
-      });
-
-    if (error || !data?.signedUrl) {
-      console.error("Supabase download error:", error?.message);
-
-      return NextResponse.json(
-        { error: "Could not generate a download link." },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
-      url: data.signedUrl,
+      url: driveDownloadUrl(storageKey),
       name: material.name,
     });
   } catch (error) {
