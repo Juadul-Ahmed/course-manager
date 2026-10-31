@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { randomUUID } from "crypto";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import { uploadToDrive, deleteFromDrive } from "@/lib/google-drive";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -167,24 +167,11 @@ export async function POST(
       );
     }
 
-    const storageKey =
-      `assignments/${id}/${randomUUID()}-${safeFileName(originalName)}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(storageKey, fileEntry, {
-        contentType: fileEntry.type || "application/octet-stream",
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Supabase assignment upload error:", uploadError);
-
-      return NextResponse.json(
-        { error: "File upload failed. Check your Supabase bucket configuration." },
-        { status: 500 },
-      );
-    }
+    const storageKey = await uploadToDrive(
+      Buffer.from(await fileEntry.arrayBuffer()),
+      originalName,
+      fileEntry.type || "application/octet-stream",
+    );
 
     uploadedStorageKey = storageKey;
 
@@ -212,13 +199,7 @@ export async function POST(
 
     if (uploadedStorageKey) {
       try {
-        const { error: cleanupError } = await supabase.storage
-          .from(BUCKET)
-          .remove([uploadedStorageKey]);
-
-        if (cleanupError) {
-          console.error("Supabase upload cleanup error:", cleanupError);
-        }
+        await deleteFromDrive(uploadedStorageKey);
       } catch (cleanupError) {
         console.error("Upload cleanup failed:", cleanupError);
       }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import { deleteFromDrive, driveDownloadUrl } from "@/lib/google-drive";
 
 export const runtime = "nodejs";
 
@@ -65,26 +65,8 @@ export async function GET(
       );
     }
 
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(attachment.storageKey, 60, {
-        download: attachment.originalName,
-      });
-
-    if (error || !data?.signedUrl) {
-      console.error(
-        "Create attachment download URL error:",
-        error?.message,
-      );
-
-      return NextResponse.json(
-        { error: "Could not create the download link." },
-        { status: 502 },
-      );
-    }
-
     return NextResponse.json({
-      url: data.signedUrl,
+      url: driveDownloadUrl(attachment.storageKey),
       name: attachment.originalName,
     });
   } catch (error) {
@@ -133,16 +115,10 @@ export async function DELETE(
       );
     }
 
-    const { error: storageError } = await supabase.storage
-      .from(BUCKET)
-      .remove([attachment.storageKey]);
-
-    if (storageError) {
-      console.error(
-        "Remove assignment file error:",
-        storageError.message,
-      );
-
+    try {
+      await deleteFromDrive(attachment.storageKey);
+    } catch (storageError) {
+      console.error("Remove assignment file error:", storageError);
       return NextResponse.json(
         { error: "Could not remove the file from storage." },
         { status: 502 },

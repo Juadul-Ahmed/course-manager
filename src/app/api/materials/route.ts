@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import { uploadToDrive, deleteFromDrive, driveDownloadUrl } from "@/lib/google-drive";
 
 export const runtime = "nodejs";
 
@@ -148,31 +148,15 @@ export async function POST(request: Request) {
       .replace(/[^\w.\- ()]/g, "_")
       .slice(-150);
 
-    const storageKey = `${course.id}/${randomUUID()}-${safeName}`;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-    const { error: uploadError } = await supabase.storage
-      .from("course-materials")
-      .upload(storageKey, fileBuffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Supabase upload error:", uploadError.message);
-
-      return NextResponse.json(
-        { error: "File upload failed. Please try again." },
-        { status: 502 },
-      );
-    }
-
+    const storageKey = await uploadToDrive(fileBuffer, safeName, file.type);
     uploadedStorageKey = storageKey;
 
     const savedFile = await prisma.uploadedFile.create({
       data: {
         name: file.name.slice(0, 255),
-        url: storageKey,
+        url: driveDownloadUrl(storageKey),
         storageKey,
         mimeType: file.type,
         size: file.size,
@@ -194,15 +178,10 @@ export async function POST(request: Request) {
     console.error("Material upload error:", error);
 
     if (uploadedStorageKey) {
-      const { error: cleanupError } = await supabase.storage
-        .from("course-materials")
-        .remove([uploadedStorageKey]);
-
-      if (cleanupError) {
-        console.error(
-          "Failed to clean up uploaded file:",
-          cleanupError.message,
-        );
+      try {
+        await deleteFromDrive(uploadedStorageKey);
+      } catch (cleanupError) {
+        console.error("Failed to clean up uploaded file:", cleanupError);
       }
     }
 
