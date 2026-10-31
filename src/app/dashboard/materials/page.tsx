@@ -788,7 +788,7 @@ export default function MaterialsPage() {
             <div className="flex flex-col gap-4 border-t border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-2 text-xs leading-5 text-gray-400">
                 <span aria-hidden="true">🔒</span>
-                Files are stored in your Supabase bucket.
+                Files are stored in your Google Drive.
               </p>
 
               <button
