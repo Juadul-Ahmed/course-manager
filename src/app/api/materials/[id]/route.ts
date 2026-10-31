@@ -66,10 +66,6 @@ export async function DELETE(
       await deleteFromDrive(storageKey);
     } catch (storageError) {
       console.error("Google Drive delete error:", storageError);
-      return NextResponse.json(
-        { error: "Could not delete the stored file. Please try again." },
-        { status: 502 },
-      );
     }
 
     await prisma.uploadedFile.delete({
